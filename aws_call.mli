@@ -2,6 +2,8 @@
    HTTP requests for all AWS APIs.
 *)
 
+val json_content_type : string
+
 val make_headers :
   secret_access_key:string ->
   content_type:string ->
@@ -11,7 +13,7 @@ val make_headers :
   region:string ->
   service:string ->
   path:string ->
-  ?query_parameters:(String.t * string) list ->
+  ?query_parameters:(string * string) list ->
   request_payload:string -> unit -> (string * string) list
 
 val tests : (string * (unit -> bool)) list
