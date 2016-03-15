@@ -1,12 +1,8 @@
 OCAML_LIBS = $(OCAML_LIBS_aws-common)
 
 FILES[] =
-  aws_common_t
-  aws_common_j
-  aws_common_v
-  aws_common
+  aws_call
 
-Atdgen(aws_common, -j-std)
 OCamlLibrary(aws-common, $(FILES))
 Meta(aws-common)
 
@@ -14,4 +10,4 @@ Meta(aws-common)
 
 .PHONY: clean
 clean:
-  rm -f *.o *.a *.cm* *~ *.annot *.run *.opt META $(ATDGEN_OUTFILES)
+  rm -f *.o *.a *.cm* *~ *.annot *.run *.opt META
