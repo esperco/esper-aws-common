@@ -293,7 +293,6 @@ let make_headers
     ?target
     ~http_request_method
     ~host
-    ~date
     ~region
     ~service
     ~path
@@ -322,7 +321,8 @@ let make_headers
   in
   BatList.flatten [
     [ "authorization", authorization;
-      "x-amz-date", Nldate.mk_mail_date date ];
+      "x-amz-date", Nldate.mk_mail_date date;
+      "content-type", content_type ];
     target;
   ]
 
