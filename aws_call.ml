@@ -7,6 +7,23 @@
 open Printf
 open Log
 
+type method_ = [
+  | `GET
+  | `POST
+  | `PUT
+  | `DELETE
+  | `HEAD
+  | `PATCH
+]
+
+let string_of_method = function
+  | `GET -> "GET"
+  | `POST -> "POST"
+  | `PUT -> "PUT"
+  | `DELETE -> "DELETE"
+  | `HEAD -> "HEAD"
+  | `PATCH -> "PATCH"
+
 let json_content_type = "application/x-amz-json-1.1"
 
 let hex_encode =
@@ -78,7 +95,7 @@ let make_canonical_headers ~host ~date =
   canonical_headers, signed_headers
 
 let make_canonical_request
-    ~http_request_method
+    ~(http_request_method: method_)
     ~host
     ~date
     ~path
@@ -90,7 +107,7 @@ let make_canonical_request
   let canonical_headers, signed_headers = make_canonical_headers ~host ~date in
   let canonical_request =
     String.concat "\n" [
-      http_request_method; (* "GET", "POST", etc. *)
+      string_of_method http_request_method; (* "GET", "POST", etc. *)
       canonical_uri; (* path, stopping before the '?' *)
       canonical_query_string; (* query string w/o '?', e.g. "x=0&y=1" *)
       canonical_headers;
@@ -103,7 +120,7 @@ let make_canonical_request
 let test_canonical_request () =
  let signed_headers, canonical_request =
   make_canonical_request
-    ~http_request_method: "GET"
+    ~http_request_method: `GET
     ~host: "iam.amazonaws.com"
     ~date: Util_time.(to_float (of_string "2015-08-30T12:36:00Z"))
     ~path: "/"
@@ -170,7 +187,7 @@ let make_string_to_sign
 let test_string_to_sign () =
   let credential_scope, signed_headers, string_to_sign =
     make_string_to_sign
-      ~http_request_method: "GET"
+      ~http_request_method: `GET
       ~host: "iam.amazonaws.com"
       ~region: "us-east-1"
       ~service: "iam"
