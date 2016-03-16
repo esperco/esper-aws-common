@@ -2,6 +2,7 @@ OCAML_LIBS = $(OCAML_LIBS_aws-common)
 
 FILES[] =
   aws_call
+  aws_cred
 
 OCamlLibrary(aws-common, $(FILES))
 Meta(aws-common)
