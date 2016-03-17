@@ -166,6 +166,7 @@ let make_string_to_sign
       ~request_payload_sha256
       ()
   in
+  logf `Debug "canonical request: %s" canonical_request;
   let string_to_sign =
     sprintf "\
       AWS4-HMAC-SHA256\n\
@@ -261,6 +262,7 @@ let make_signature
       ~request_payload_sha256
       ()
   in
+  logf `Debug "string to sign: %s" string_to_sign;
   let signing_key =
     make_signing_key
       ~secret_access_key
