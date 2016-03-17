@@ -368,7 +368,7 @@ let make_headers
   in
   BatList.flatten [
     [ "authorization", authorization;
-      "x-amz-date", Nldate.mk_mail_date date;
+      "x-amz-date", make_amz_date date;
       "content-type", content_type;
       "x-amz-content-sha256", request_payload_sha256];
     target;
