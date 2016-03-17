@@ -14,6 +14,7 @@ type method_ = [
 val json_content_type : string
 
 val make_headers :
+  access_key_id:string ->
   secret_access_key:string ->
   content_type:string ->
   ?target:string ->

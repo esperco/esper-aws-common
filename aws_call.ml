@@ -26,15 +26,12 @@ let string_of_method = function
 
 let json_content_type = "application/x-amz-json-1.1"
 
-let hex_encode =
+let hex_encode s =
   let transform = Cryptokit.Hexa.encode () in
-  fun s ->
-    Cryptokit.transform_string transform s
+  Cryptokit.transform_string transform s
 
-let sha256 =
-  let hash = Cryptokit.Hash.sha256 () in
-  fun s ->
-    Cryptokit.hash_string hash s
+let sha256 s =
+  Cryptokit.hash_string (Cryptokit.Hash.sha256 ()) s
 
 let test_sha256 () =
   hex_encode (sha256 "")
@@ -100,7 +97,7 @@ let make_canonical_request
     ~date
     ~path
     ?(query_parameters = [])
-    ~request_payload
+    ~request_payload_sha256 (* hex-encoded *)
     () =
   let canonical_uri = path in
   let canonical_query_string = make_canonical_query_string query_parameters in
@@ -112,24 +109,26 @@ let make_canonical_request
       canonical_query_string; (* query string w/o '?', e.g. "x=0&y=1" *)
       canonical_headers;
       signed_headers; (* names of the headers included in canonical_headers *)
-      hex_encode (sha256 request_payload);
+      request_payload_sha256;
     ]
   in
   signed_headers, canonical_request
 
 let test_canonical_request () =
- let signed_headers, canonical_request =
-  make_canonical_request
-    ~http_request_method: `GET
-    ~host: "iam.amazonaws.com"
-    ~date: Util_time.(to_float (of_string "2015-08-30T12:36:00Z"))
-    ~path: "/"
-    ~query_parameters: [ "Version", "2010-05-08";
-                         "Action", "ListUsers" ]
-    ~request_payload: ""
-    ()
- in
- let expected = "\
+  let request_payload = "" in
+  let request_payload_sha256 = hex_encode (sha256 request_payload) in
+  let signed_headers, canonical_request =
+    make_canonical_request
+      ~http_request_method: `GET
+      ~host: "iam.amazonaws.com"
+      ~date: Util_time.(to_float (of_string "2015-08-30T12:36:00Z"))
+      ~path: "/"
+      ~query_parameters: [ "Version", "2010-05-08";
+                           "Action", "ListUsers" ]
+      ~request_payload_sha256
+      ()
+  in
+  let expected = "\
 GET
 /
 Action=ListUsers&Version=2010-05-08
@@ -154,7 +153,7 @@ let make_string_to_sign
     ~date
     ~path
     ?query_parameters
-    ~request_payload
+    ~request_payload_sha256
     () =
   let credential_scope = make_credential_scope ~date ~region ~service in
   let signed_headers, canonical_request =
@@ -164,7 +163,7 @@ let make_string_to_sign
       ~date
       ~path
       ?query_parameters
-      ~request_payload
+      ~request_payload_sha256
       ()
   in
   let string_to_sign =
@@ -175,7 +174,7 @@ let make_string_to_sign
       %s"
       (make_amz_date date)
       credential_scope
-      (hex_encode (sha256 canonical_request))
+      request_payload_sha256
   in
   credential_scope, signed_headers, string_to_sign
 
@@ -185,6 +184,8 @@ let make_string_to_sign
    X-Amz-Date: 20150830T123600Z
 *)
 let test_string_to_sign () =
+  let request_payload = "" in
+  let request_payload_sha256 = hex_encode (sha256 request_payload) in
   let credential_scope, signed_headers, string_to_sign =
     make_string_to_sign
       ~http_request_method: `GET
@@ -195,14 +196,14 @@ let test_string_to_sign () =
       ~path: "/"
       ~query_parameters: [ "Action", "ListUsers";
                            "Version", "2010-05-08" ]
-      ~request_payload: ""
+      ~request_payload_sha256
       ()
   in
   let expected = "\
 AWS4-HMAC-SHA256
 20150830T123600Z
 20150830/us-east-1/iam/aws4_request
-d990da287c07a9e88f333eb5e1730f6d5a2ff912af59bb342c1cf40596c5d334"
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   in
   string_to_sign = expected
 
@@ -246,7 +247,7 @@ let make_signature
     ~service
     ~path
     ?query_parameters
-    ~request_payload
+    ~request_payload_sha256
     () =
   let credential_scope, signed_headers, string_to_sign =
     make_string_to_sign
@@ -257,7 +258,7 @@ let make_signature
       ~date
       ~path
       ?query_parameters
-      ~request_payload
+      ~request_payload_sha256
       ()
   in
   let signing_key =
@@ -272,6 +273,7 @@ let make_signature
   credential_scope, signed_headers, signature
 
 let make_authorization_header
+    ~access_key_id
     ~secret_access_key
     ~http_request_method
     ~host
@@ -280,7 +282,7 @@ let make_authorization_header
     ~service
     ~path
     ?query_parameters
-    ~request_payload
+    ~request_payload_sha256
     () =
   let credential_scope, signed_headers, signature =
     make_signature
@@ -292,19 +294,20 @@ let make_authorization_header
       ~service
       ~path
       ?query_parameters
-      ~request_payload
+      ~request_payload_sha256
       ()
   in
   sprintf "\
 AWS4-HMAC-SHA256 \
-Credential=%s, \
+Credential=%s/%s, \
 SignedHeaders=%s, \
 Signature=%s"
-    credential_scope
+    access_key_id credential_scope
     signed_headers
     signature
 
 let make_headers
+    ~access_key_id
     ~secret_access_key
     ~content_type
     ?target
@@ -318,8 +321,10 @@ let make_headers
     () =
 
   let date = Unix.time () in
+  let request_payload_sha256 = hex_encode (sha256 request_payload) in
   let authorization =
     make_authorization_header
+      ~access_key_id
       ~secret_access_key
       ~http_request_method
       ~host
@@ -328,7 +333,7 @@ let make_headers
       ~service
       ~path
       ?query_parameters
-      ~request_payload
+      ~request_payload_sha256
       ()
   in
   let target =
@@ -339,7 +344,8 @@ let make_headers
   BatList.flatten [
     [ "authorization", authorization;
       "x-amz-date", Nldate.mk_mail_date date;
-      "content-type", content_type ];
+      "content-type", content_type;
+      "x-amz-content-sha256", request_payload_sha256];
     target;
   ]
 
