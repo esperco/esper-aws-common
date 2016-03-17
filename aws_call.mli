@@ -26,4 +26,10 @@ val make_headers :
   ?query_parameters:(string * string) list ->
   request_payload:string -> unit -> (string * string) list
 
+val test_sha256 : unit -> bool
+val test_canonical_request : unit -> bool
+val test_string_to_sign : unit -> bool
+val test_signing_key : unit -> bool
+val test_signature : unit -> bool
+
 val tests : (string * (unit -> bool)) list

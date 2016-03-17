@@ -174,7 +174,7 @@ let make_string_to_sign
       %s"
       (make_amz_date date)
       credential_scope
-      request_payload_sha256
+      (hex_encode (sha256 canonical_request))
   in
   credential_scope, signed_headers, string_to_sign
 
@@ -189,21 +189,21 @@ let test_string_to_sign () =
   let credential_scope, signed_headers, string_to_sign =
     make_string_to_sign
       ~http_request_method: `GET
-      ~host: "iam.amazonaws.com"
+      ~host: "example.amazonaws.com"
       ~region: "us-east-1"
-      ~service: "iam"
+      ~service: "service"
       ~date: Util_time.(to_float (of_string "2015-08-30T12:36:00Z"))
       ~path: "/"
-      ~query_parameters: [ "Action", "ListUsers";
-                           "Version", "2010-05-08" ]
+      ~query_parameters: [ "Param2", "value2";
+                           "Param1", "value1" ]
       ~request_payload_sha256
       ()
   in
   let expected = "\
 AWS4-HMAC-SHA256
 20150830T123600Z
-20150830/us-east-1/iam/aws4_request
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+20150830/us-east-1/service/aws4_request
+816cd5b414d056048ba4f7c5386d6e0533120fb1fcfa93762cf0fc39e2cf19e0"
   in
   string_to_sign = expected
 
@@ -271,6 +271,31 @@ let make_signature
   in
   let signature = hex_encode (hmac_sha256 signing_key string_to_sign) in
   credential_scope, signed_headers, signature
+
+(*
+   "A Simple GET Request with Parameters" from
+   http://docs.aws.amazon.com/general/latest/gr/signature-v4-test-suite.html
+*)
+let test_signature () =
+  let credential_scope, signed_headers, signature =
+    make_signature
+      ~secret_access_key: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"
+      ~http_request_method: `GET
+      ~host: "example.amazonaws.com"
+      ~date: Util_time.(to_float (of_string "2015-08-30T12:36:00Z"))
+      ~region: "us-east-1"
+      ~service: "service"
+      ~path: "/"
+      ~query_parameters: [ "Param2", "value2";
+                           "Param1", "value1" ]
+      ~request_payload_sha256: (hex_encode (sha256 ""))
+      ()
+  in
+  assert (credential_scope = "20150830/us-east-1/service/aws4_request");
+  let expected =
+    "b97d918cfa904a5beff61c982a1b6f458b799221646efd99d3219ec94cdf2500"
+  in
+  signature = expected
 
 let make_authorization_header
     ~access_key_id
@@ -354,4 +379,5 @@ let tests = [
   "canonical request", test_canonical_request;
   "string to sign", test_string_to_sign;
   "signing key", test_signing_key;
+  "signature", test_signature;
 ]
