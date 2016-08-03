@@ -26,21 +26,9 @@ let string_of_method = function
 
 let json_content_type = "application/x-amz-json-1.1"
 
-let hex_encode s =
-  let transform = Cryptokit.Hexa.encode () in
-  Cryptokit.transform_string transform s
-
-let sha256 s =
-  Cryptokit.hash_string (Cryptokit.Hash.sha256 ()) s
-
 let test_sha256 () =
-  hex_encode (sha256 "")
+  Util_hex.hex_encode (Util_sha256.hash "")
   = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-
-let hmac_sha256 signing_key =
-  let hash = Cryptokit.MAC.hmac_sha256 signing_key in
-  fun s ->
-    Cryptokit.hash_string hash s
 
 (*
    Percent-encode exactly how specified by the docs.
@@ -116,7 +104,9 @@ let make_canonical_request
 
 let test_canonical_request () =
   let request_payload = "" in
-  let request_payload_sha256 = hex_encode (sha256 request_payload) in
+  let request_payload_sha256 =
+    Util_hex.hex_encode (Util_sha256.hash request_payload)
+  in
   let signed_headers, canonical_request =
     make_canonical_request
       ~http_request_method: `GET
@@ -174,7 +164,7 @@ let make_string_to_sign
       %s"
       (make_amz_date date)
       credential_scope
-      (hex_encode (sha256 canonical_request))
+      (Util_hex.hex_encode (Util_sha256.hash canonical_request))
   in
   credential_scope, signed_headers, string_to_sign
 
@@ -185,7 +175,9 @@ let make_string_to_sign
 *)
 let test_string_to_sign () =
   let request_payload = "" in
-  let request_payload_sha256 = hex_encode (sha256 request_payload) in
+  let request_payload_sha256 =
+    Util_hex.hex_encode (Util_sha256.hash request_payload)
+  in
   let credential_scope, signed_headers, string_to_sign =
     make_string_to_sign
       ~http_request_method: `GET
@@ -214,13 +206,13 @@ let make_signing_key
     ~service
     () =
   let k_date =
-    hmac_sha256
+    Util_hmac_sha256.hash
       ("AWS4" ^ secret_access_key)
       (make_amz_dateonly date)
   in
-  let k_region = hmac_sha256 k_date region in
-  let k_service = hmac_sha256 k_region service in
-  let k_signing = hmac_sha256 k_service "aws4_request" in
+  let k_region = Util_hmac_sha256.hash k_date region in
+  let k_service = Util_hmac_sha256.hash k_region service in
+  let k_signing = Util_hmac_sha256.hash k_service "aws4_request" in
   k_signing
 
 let test_signing_key () =
@@ -269,7 +261,9 @@ let make_signature
       ~service
       ()
   in
-  let signature = hex_encode (hmac_sha256 signing_key string_to_sign) in
+  let signature =
+    Util_hex.hex_encode (Util_hmac_sha256.hash signing_key string_to_sign)
+  in
   credential_scope, signed_headers, signature
 
 (*
@@ -288,7 +282,7 @@ let test_signature () =
       ~path: "/"
       ~query_parameters: [ "Param2", "value2";
                            "Param1", "value1" ]
-      ~request_payload_sha256: (hex_encode (sha256 ""))
+      ~request_payload_sha256: (Util_hex.hex_encode (Util_sha256.hash ""))
       ()
   in
   assert (credential_scope = "20150830/us-east-1/service/aws4_request");
@@ -346,7 +340,9 @@ let make_headers
     () =
 
   let date = Unix.time () in
-  let request_payload_sha256 = hex_encode (sha256 request_payload) in
+  let request_payload_sha256 =
+    Util_hex.hex_encode (Util_sha256.hash request_payload)
+  in
   let authorization =
     make_authorization_header
       ~access_key_id
